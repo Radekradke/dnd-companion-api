@@ -12,16 +12,11 @@ const prisma = new PrismaClient();
 const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || 'dnd-ficha-viva-secret-change-in-prod';
 const allowed = (process.env.CORS_ORIGIN || '*').split(',').map(s => s.trim());
+const corsOrigin = allowed.includes('*') ? '*' : allowed;
 
 app.use(compression());
-app.use(cors({
-  origin(origin, cb) {
-    if (!origin || allowed.includes('*') || allowed.includes(origin)) return cb(null, true);
-    return cb(new Error('CORS bloqueado'));
-  },
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-device-id'],
-  credentials: false
-}));
+app.use(cors({ origin: corsOrigin, credentials: false }));
+app.options('*', cors({ origin: corsOrigin, credentials: false }));
 app.use(express.json({ limit: '25mb' }));
 
 // Rate limiters
