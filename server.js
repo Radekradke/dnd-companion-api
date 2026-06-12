@@ -197,6 +197,49 @@ app.delete('/characters/:id', async (req, res) => {
   }
 });
 
+// Gera (ou reaproveita) um token de compartilhamento read-only para o personagem
+app.post('/characters/:id/share', async (req, res) => {
+  try {
+    const character = await prisma.character.findFirst({ where: charWhere(req, req.params.id) });
+    if (!character) return res.status(404).json({ error: 'Personagem não encontrado' });
+    let share = await prisma.characterShare.findUnique({ where: { characterId: character.id } });
+    if (!share) share = await prisma.characterShare.create({ data: { characterId: character.id } });
+    res.json({ shareToken: share.token });
+  } catch (e) {
+    console.error('[share]', e);
+    res.status(500).json({ error: 'Erro ao gerar link de compartilhamento.' });
+  }
+});
+
+// Revoga o compartilhamento do personagem
+app.delete('/characters/:id/share', async (req, res) => {
+  try {
+    const character = await prisma.character.findFirst({ where: charWhere(req, req.params.id) });
+    if (!character) return res.status(404).json({ error: 'Personagem não encontrado' });
+    await prisma.characterShare.deleteMany({ where: { characterId: character.id } });
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('[share-delete]', e);
+    res.status(500).json({ error: 'Erro ao revogar compartilhamento.' });
+  }
+});
+
+// ── SHARE PÚBLICO (read-only, sem autenticação) ───────────────────────────────
+app.get('/share/:token', apiLimiter, async (req, res) => {
+  try {
+    const share = await prisma.characterShare.findUnique({
+      where: { token: req.params.token },
+      include: { character: true }
+    });
+    if (!share || !share.character) return res.status(404).json({ error: 'Ficha compartilhada não encontrada ou revogada.' });
+    const c = share.character;
+    res.json({ name: c.name, summary: c.summary, data: c.data, updatedAt: c.updatedAt, readOnly: true });
+  } catch (e) {
+    console.error('[share-get]', e);
+    res.status(500).json({ error: 'Erro ao carregar ficha compartilhada.' });
+  }
+});
+
 // ── ERROR HANDLER ───────────────────────────────────────────────────────────
 app.use((err, _req, res, _next) => {
   console.error(err);
